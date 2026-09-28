@@ -52,29 +52,33 @@ class Tache:
         return self.y1 - self.y0
 
 
-def _hsv(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    rgb = rgb.astype(np.float32) / 255.0
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    maxi = rgb.max(axis=-1)
-    mini = rgb.min(axis=-1)
-    delta = maxi - mini
-    sat = np.where(maxi > 0, delta / np.maximum(maxi, 1e-6), 0)
-    d = np.maximum(delta, 1e-6)
-    teinte = np.where(
-        maxi == r,
-        ((g - b) / d) % 6,
-        np.where(maxi == g, (b - r) / d + 2, (r - g) / d + 4),
+def _teintes(rgb: np.ndarray) -> np.ndarray:
+    """Teinte en degrés des pixels vifs (saturation >= SAT_MIN, valeur >=
+    VAL_MIN), -1 pour les autres. Calcul en entiers, teinte seulement sur les
+    pixels vifs : c'est ce qui rend l'analyse rapide."""
+    r = rgb[..., 0].astype(np.int16)
+    g = rgb[..., 1].astype(np.int16)
+    b = rgb[..., 2].astype(np.int16)
+    maxi = np.maximum(np.maximum(r, g), b)
+    delta = maxi - np.minimum(np.minimum(r, g), b)
+    vifs = (maxi >= VAL_MIN * 255) & (delta >= SAT_MIN * maxi) & (delta > 0)
+    teinte = np.full(r.shape, -1.0, dtype=np.float32)
+    rv, gv, bv, mv = r[vifs], g[vifs], b[vifs], maxi[vifs]
+    d = delta[vifs].astype(np.float32)
+    teinte[vifs] = np.where(
+        mv == rv,
+        ((gv - bv) / d) % 6,
+        np.where(mv == gv, (bv - rv) / d + 2, (rv - gv) / d + 4),
     ) * 60
-    return teinte, sat, maxi
+    return teinte
 
 
-def _masque(teinte, sat, val, plage) -> np.ndarray:
+def _masque(teinte: np.ndarray, plage: tuple[int, int]) -> np.ndarray:
     lo, hi = plage
     if lo <= hi:
-        dans = (teinte >= lo) & (teinte <= hi)
-    else:  # plage qui passe par 0° (rouge)
-        dans = (teinte >= lo) | (teinte <= hi)
-    return dans & (sat >= SAT_MIN) & (val >= VAL_MIN)
+        return (teinte >= lo) & (teinte <= hi)
+    # plage qui passe par 0° (rouge)
+    return (teinte >= lo) | ((teinte >= 0) & (teinte <= hi))
 
 
 def _taches(masque: np.ndarray) -> list[Tache]:
@@ -140,19 +144,20 @@ def _fusionner(taches: list[Tache]) -> list[Tache]:
     return taches
 
 
-def trouver_factions(rgb: np.ndarray) -> dict[str, tuple[int, int]] | None:
+def trouver_factions(rgb: np.ndarray, bgr: bool = False) -> dict[str, tuple[int, int]] | None:
     """Renvoie le centre (en pixels de l'image d'origine) de chaque logo,
-    ou None si l'écran de choix de faction n'est pas visible."""
+    ou None si l'écran de choix de faction n'est pas visible.
+    bgr=True pour une capture d'écran Windows (BGRA), sans conversion."""
     h0, w0 = rgb.shape[:2]
     pas = max(1, round(w0 / LARGEUR_ANALYSE))
-    petit = rgb[::pas, ::pas, :3]
+    petit = rgb[::pas, ::pas, 2::-1] if bgr else rgb[::pas, ::pas, :3]
     h = petit.shape[0]
-    teinte, sat, val = _hsv(petit)
+    teinte = _teintes(petit)
 
     logos: dict[str, Tache] = {}
     for cle, f in FACTIONS.items():
         candidates = [
-            t for t in _fusionner(_taches(_masque(teinte, sat, val, f["teinte"])))
+            t for t in _fusionner(_taches(_masque(teinte, f["teinte"])))
             if HAUTEUR_MIN * h <= t.hauteur <= HAUTEUR_MAX * h
             and 0.5 <= t.largeur / max(t.hauteur, 1) <= 2
         ]

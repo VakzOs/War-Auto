@@ -6,13 +6,18 @@ Petit autoclicker Windows qui choisit automatiquement ta faction sur l'écran
 ## Utilisation
 
 1. Lance `War-Auto.exe`.
-2. Clique sur **ACTIVER** (ou appuie sur **F8**, même en jeu) : il ne fait rien
-   tant qu'aucune équipe n'est choisie.
-3. Choisis ton équipe (**Bleu**, **Rouge** ou **Vert**). Dès que l'écran de
-   faction apparaît, il clique sur le logo de cette équipe (toutes les 0,4 s
-   tant que l'écran reste affiché).
+2. Clique sur **ACTIVER** (ou **F8**, même en jeu) : il ne fait rien tant
+   qu'aucune équipe n'est choisie.
+3. Choisis ton équipe : clic sur son logo, ou raccourci en jeu
+   (**F5** Bleu, **F6** Rouge, **F7** Vert). Le raccourci d'une équipe
+   l'active aussi. Dès que l'écran de faction apparaît, il clique sur le logo.
 
-F8 désactive à tout moment. Recliquer sur l'équipe choisie la désélectionne.
+- Un bip confirme chaque raccourci (aigu : activé, grave : désactivé).
+- Clique sur une touche affichée (F5, F8…) puis appuie sur la nouvelle touche
+  pour la changer (Échap annule).
+- **Délai entre clics** : 50 ms par défaut, réglable de 0 à 1000 ms.
+- Réglages enregistrés dans `%APPDATA%\War-Auto\config.json`.
+- L'interface s'agrandit seule selon la mise à l'échelle Windows et en 4K.
 
 ## Comment il trouve les logos
 

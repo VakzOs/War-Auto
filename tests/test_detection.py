@@ -50,3 +50,9 @@ def test_un_seul_logo_ne_suffit_pas():
     img = _capture()
     img[:, 230:] = 20  # on masque le rouge et le vert
     assert trouver_factions(img) is None
+
+
+def test_capture_windows_bgra():
+    img = _capture(2.0)
+    bgra = np.dstack([img[..., ::-1], np.full(img.shape[:2], 255, np.uint8)])
+    _verifier(trouver_factions(bgra, bgr=True), 2.0)
