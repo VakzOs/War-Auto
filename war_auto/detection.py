@@ -21,6 +21,8 @@ FACTIONS = {
 }
 SAT_MIN = 0.5
 VAL_MIN = 0.6
+# Une équipe pleine a son logo grisé : même teinte, mais très sombre (~0.2).
+VAL_MIN_GRISE = 0.14
 
 LARGEUR_ANALYSE = 640  # l'image est réduite à ~640 px de large avant analyse
 TAILLE_CELLULE = 3  # pixels réduits par cellule de la grille
@@ -52,16 +54,16 @@ class Tache:
         return self.y1 - self.y0
 
 
-def _teintes(rgb: np.ndarray) -> np.ndarray:
+def _teintes(rgb: np.ndarray, val_min: float = VAL_MIN) -> np.ndarray:
     """Teinte en degrés des pixels vifs (saturation >= SAT_MIN, valeur >=
-    VAL_MIN), -1 pour les autres. Calcul en entiers, teinte seulement sur les
+    val_min), -1 pour les autres. Calcul en entiers, teinte seulement sur les
     pixels vifs : c'est ce qui rend l'analyse rapide."""
     r = rgb[..., 0].astype(np.int16)
     g = rgb[..., 1].astype(np.int16)
     b = rgb[..., 2].astype(np.int16)
     maxi = np.maximum(np.maximum(r, g), b)
     delta = maxi - np.minimum(np.minimum(r, g), b)
-    vifs = (maxi >= VAL_MIN * 255) & (delta >= SAT_MIN * maxi) & (delta > 0)
+    vifs = (maxi >= val_min * 255) & (delta >= SAT_MIN * maxi) & (delta > 0)
     teinte = np.full(r.shape, -1.0, dtype=np.float32)
     rv, gv, bv, mv = r[vifs], g[vifs], b[vifs], maxi[vifs]
     d = delta[vifs].astype(np.float32)
@@ -153,17 +155,28 @@ def trouver_factions(rgb: np.ndarray, bgr: bool = False) -> dict[str, tuple[int,
     petit = rgb[::pas, ::pas, 2::-1] if bgr else rgb[::pas, ::pas, :3]
     h = petit.shape[0]
     teinte = _teintes(petit)
+    teinte_grise = None
 
-    logos: dict[str, Tache] = {}
-    for cle, f in FACTIONS.items():
+    def logo(teinte, plage) -> Tache | None:
         candidates = [
-            t for t in _fusionner(_taches(_masque(teinte, f["teinte"])))
+            t for t in _fusionner(_taches(_masque(teinte, plage)))
             if HAUTEUR_MIN * h <= t.hauteur <= HAUTEUR_MAX * h
             and 0.5 <= t.largeur / max(t.hauteur, 1) <= 2
         ]
-        if not candidates:
+        return max(candidates, key=lambda t: t.cellules) if candidates else None
+
+    logos: dict[str, Tache] = {}
+    for cle, f in FACTIONS.items():
+        trouve = logo(teinte, f["teinte"])
+        if trouve is None:
+            # Pas de logo vif : l'équipe est peut-être pleine (logo grisé).
+            # On clique quand même, une place peut se libérer.
+            if teinte_grise is None:
+                teinte_grise = _teintes(petit, VAL_MIN_GRISE)
+            trouve = logo(teinte_grise, f["teinte"])
+        if trouve is None:
             return None
-        logos[cle] = max(candidates, key=lambda t: t.cellules)
+        logos[cle] = trouve
 
     # Les trois logos doivent se ressembler : même hauteur à ±40 %, même ligne.
     hauteurs = [t.hauteur for t in logos.values()]
