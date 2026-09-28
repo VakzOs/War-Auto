@@ -1,5 +1,7 @@
 # War-Auto
 
+par [@VakzOs](https://github.com/VakzOs)
+
 Petit autoclicker Windows qui choisit automatiquement ta faction sur l'écran
 « Choisir une faction » (Bleu, Rouge, Vert).
 
@@ -35,7 +37,10 @@ soit la résolution (1080p, 1440p, 4K, fenêtré) et sur plusieurs écrans.
 Chaque push construit `War-Auto.exe` sur GitHub Actions : onglet **Actions** →
 dernier run **Build** → artefact **War-Auto**.
 
-Ou en local (Python 3.10+) : `build.bat` → `dist\War-Auto.exe`.
+Ou en local (Python 3.10+) : `build.bat` → `dist\War-Auto.exe`. La
+configuration est dans `War-Auto.spec` (icône, propriétés du fichier).
+Si l'exe garde l'ancienne icône dans l'explorateur, c'est le cache d'icônes
+de Windows : déplace ou renomme le fichier.
 
 Pour lancer sans compiler : `pip install -r requirements.txt` puis
 `python War-Auto.py`.

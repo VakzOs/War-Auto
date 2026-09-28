@@ -17,6 +17,7 @@ import threading
 import time
 import tkinter as tk
 import wave
+import webbrowser
 from pathlib import Path
 
 import mss
@@ -192,7 +193,7 @@ class Fenetre:
         # Polices en points : Tk les convertit avec ce facteur.
         self.racine.tk.call("tk", "scaling", self.echelle * 96 / 72)
         s = self.s
-        self.racine.title("War-Auto")
+        self.racine.title("War-Auto — @VakzOs")
         self.racine.configure(bg=FOND, padx=s(16), pady=s(16))
         self.racine.resizable(False, False)
         self.racine.attributes("-topmost", True)
@@ -266,8 +267,14 @@ class Fenetre:
 
         tk.Label(self.racine, textvariable=self.statut, bg=FOND, fg=GRIS,
                  font=(POLICE, 9), wraplength=s(300), justify="left").pack(anchor="w", pady=(s(12), 0))
-        tk.Label(self.racine, text="Clique sur une touche pour la changer.", bg=FOND, fg=GRIS,
-                 font=(POLICE, 8)).pack(anchor="w")
+        pied = tk.Frame(self.racine, bg=FOND)
+        pied.pack(fill="x")
+        tk.Label(pied, text="Clique sur une touche pour la changer.", bg=FOND, fg=GRIS,
+                 font=(POLICE, 8)).pack(side="left")
+        credit = tk.Label(pied, text="@VakzOs", bg=FOND, fg=TEXTE, cursor="hand2",
+                          font=(POLICE, 8, "bold"))
+        credit.pack(side="right")
+        credit.bind("<Button-1>", lambda _e: webbrowser.open("https://github.com/VakzOs"))
 
         self.rafraichir()
         self.automate.start()
