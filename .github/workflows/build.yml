@@ -16,6 +16,7 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
       - run: python -m PyInstaller --clean --noconfirm War-Auto.spec
+      - run: python assets/verifier_exe.py
       - uses: actions/upload-artifact@v4
         with:
           name: War-Auto

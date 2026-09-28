@@ -2,3 +2,4 @@
 pillow
 pytest
 pyinstaller
+pefile

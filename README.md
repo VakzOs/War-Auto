@@ -41,8 +41,9 @@ dernier run **Build** → artefact **War-Auto**.
 
 Ou en local (Python 3.10+) : `build.bat` → `dist\War-Auto.exe`. La
 configuration est dans `War-Auto.spec` (icône, propriétés du fichier).
-Si l'exe garde l'ancienne icône dans l'explorateur, c'est le cache d'icônes
-de Windows : déplace ou renomme le fichier.
+À la fin, `build.bat` vérifie que l'exe contient bien l'icône et les
+propriétés (`assets/verifier_exe.py`) et vide le cache d'icônes de
+l'explorateur.
 
 Pour lancer sans compiler : `pip install -r requirements.txt` puis
 `python War-Auto.py`.
