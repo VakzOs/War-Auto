@@ -146,9 +146,16 @@ def _fusionner(taches: list[Tache]) -> list[Tache]:
     return taches
 
 
-def trouver_factions(rgb: np.ndarray, bgr: bool = False) -> dict[str, tuple[int, int]] | None:
-    """Renvoie le centre (en pixels de l'image d'origine) de chaque logo,
-    ou None si l'écran de choix de faction n'est pas visible.
+def analyser_ecran(rgb: np.ndarray, bgr: bool = False) -> tuple[dict[str, tuple[int, int]] | None, bool]:
+    """Analyse une capture et renvoie (logos, ecran_present).
+
+    - logos : centre (en pixels de l'image d'origine) de chaque logo, ou None
+      si l'écran de choix n'est pas reconnu avec certitude (3 logos de taille
+      proche et alignés). Sert à cliquer.
+    - ecran_present : critère souple, au moins 2 logos de faction visibles
+      (vifs ou grisés). Sert à savoir si on est encore sur l'écran de
+      sélection, même quand son aspect change après un clic.
+
     bgr=True pour une capture d'écran Windows (BGRA), sans conversion."""
     h0, w0 = rgb.shape[:2]
     pas = max(1, round(w0 / LARGEUR_ANALYSE))
@@ -174,19 +181,27 @@ def trouver_factions(rgb: np.ndarray, bgr: bool = False) -> dict[str, tuple[int,
             if teinte_grise is None:
                 teinte_grise = _teintes(petit, VAL_MIN_GRISE)
             trouve = logo(teinte_grise, f["teinte"])
-        if trouve is None:
-            return None
-        logos[cle] = trouve
+        if trouve is not None:
+            logos[cle] = trouve
+
+    present = len(logos) >= 2
+    if len(logos) < len(FACTIONS):
+        return None, present
 
     # Les trois logos doivent se ressembler : même hauteur à ±40 %, même ligne.
     hauteurs = [t.hauteur for t in logos.values()]
     if max(hauteurs) > 1.4 * min(hauteurs):
-        return None
+        return None, present
     centres_y = [t.centre[1] for t in logos.values()]
     if max(centres_y) - min(centres_y) > 0.5 * max(hauteurs):
-        return None
+        return None, present
 
     return {
         cle: (int(t.centre[0] * pas), int(t.centre[1] * pas))
         for cle, t in logos.items()
-    }
+    }, True
+
+
+def trouver_factions(rgb: np.ndarray, bgr: bool = False) -> dict[str, tuple[int, int]] | None:
+    """Centre de chaque logo, ou None si l'écran de choix n'est pas reconnu."""
+    return analyser_ecran(rgb, bgr)[0]

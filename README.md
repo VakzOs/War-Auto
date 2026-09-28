@@ -16,8 +16,10 @@ Petit autoclicker Windows qui choisit automatiquement ta faction sur l'écran
 
 - Un bip confirme chaque raccourci (aigu : activé, grave : désactivé).
   **Volume des bips** réglable (25 % par défaut, 0 = muet).
-- **Arrêt automatique** : 10 s après le dernier clic, si l'écran de faction
-  a disparu, l'autoclick se désactive (bip grave).
+- **Arrêt automatique** : après un clic, si plus aucun logo de faction
+  n'est visible pendant 10 s (écran de sélection quitté), l'autoclick se
+  désactive (bip grave). Tant que tu es sur l'écran de sélection, il reste
+  actif.
 - Une équipe pleine a son logo **grisé** : il continue de cliquer dessus,
   pour prendre une place dès qu'elle se libère.
 - Clique sur une touche affichée (F5, F8…) puis appuie sur la nouvelle touche

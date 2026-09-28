@@ -23,12 +23,12 @@ from pathlib import Path
 import mss
 import numpy as np
 
-from war_auto.detection import FACTIONS, trouver_factions
+from war_auto.detection import FACTIONS, analyser_ecran
 from war_auto.icone import ICONE
 from war_auto.logos import LOGOS
 
 INTERVALLE_RECHERCHE = 0.02  # s entre deux analyses quand l'écran n'est pas là
-ARRET_AUTO = 10  # s sans écran de faction après un clic -> désactivation
+ARRET_AUTO = 10  # s sans écran de sélection, après un clic -> désactivation
 
 COULEURS = {"bleu": "#4fafe7", "rouge": "#f1553f", "vert": "#22d760"}
 FOND = "#141414"
@@ -152,6 +152,7 @@ class Automate(threading.Thread):
         self._signaler = signaler
         self._arret_auto = arret_auto
         self._dernier_clic: float | None = None
+        self._ecran_vu = 0.0  # dernier instant où l'écran de sélection était visible
         self._dernier_message = ""
         self._ecran_prefere = 0  # on commence par l'écran où les logos étaient
 
@@ -167,15 +168,19 @@ class Automate(threading.Thread):
                     self._dernier_clic = None
                     time.sleep(INTERVALLE_RECHERCHE)
                     continue
-                cible = self.trouver(capture)
+                cible, present = self.trouver(capture)
+                if present:
+                    self._ecran_vu = time.monotonic()
                 if cible:
                     cliquer(*cible)
                     self._dernier_clic = time.monotonic()
                     self.signaler(f"Clic sur {FACTIONS[self.faction]['nom']} ({cible[0]}, {cible[1]})")
                     time.sleep(self.delai_clic_ms / 1000)
-                elif self._dernier_clic and time.monotonic() - self._dernier_clic >= ARRET_AUTO:
-                    # L'écran a disparu depuis 10 s après nos clics : la faction
-                    # est prise, on s'arrête.
+                elif self._dernier_clic and time.monotonic() - self._ecran_vu >= ARRET_AUTO:
+                    # Après nos clics, plus aucun logo de faction depuis 10 s :
+                    # on a quitté l'écran de sélection, on s'arrête. Tant que
+                    # des logos restent visibles (même si l'écran a changé
+                    # d'aspect), on continue.
                     self.actif = False
                     self._dernier_clic = None
                     self._arret_auto()
@@ -183,17 +188,20 @@ class Automate(threading.Thread):
                     self.signaler("En attente de l'écran de faction…")
                     time.sleep(INTERVALLE_RECHERCHE)
 
-    def trouver(self, capture) -> tuple[int, int] | None:
+    def trouver(self, capture) -> tuple[tuple[int, int] | None, bool]:
+        """(point à cliquer ou None, écran de sélection visible ?)"""
         ecrans = capture.monitors[1:]
         ordre = sorted(range(len(ecrans)), key=lambda i: i != self._ecran_prefere)
+        present = False
         for i in ordre:
             ecran = ecrans[i]
-            logos = trouver_factions(np.asarray(capture.grab(ecran)), bgr=True)
+            logos, vu = analyser_ecran(np.asarray(capture.grab(ecran)), bgr=True)
+            present = present or vu
             if logos and self.faction in logos:
                 self._ecran_prefere = i
                 x, y = logos[self.faction]
-                return ecran["left"] + x, ecran["top"] + y
-        return None
+                return (ecran["left"] + x, ecran["top"] + y), True
+        return None, present
 
 
 class Fenetre:

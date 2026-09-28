@@ -81,3 +81,30 @@ def test_logos_grises_reels():
         tache = max(_fusionner(_taches(_masque(teinte, FACTIONS[cle]["teinte"]))), key=lambda t: t.cellules)
         cx, cy = tache.centre
         assert abs(cx - x) < 20 and abs(cy - y) < 20, (cle, tache)
+
+
+def test_ecran_present_meme_si_non_reconnu():
+    """Un seul logo masqué ou déformé : on ne clique plus, mais l'écran de
+    sélection est toujours considéré comme présent (pas d'arrêt auto)."""
+    from war_auto.detection import analyser_ecran
+
+    img = _capture(2.0)
+    img[:, 80 * 2:230 * 2] = 20  # plus de logo bleu
+    logos, present = analyser_ecran(img)
+    assert logos is None and present
+
+
+def test_ecran_absent():
+    from war_auto.detection import analyser_ecran
+
+    img = _capture(2.0)
+    img[:, 80 * 2:] = 20  # plus aucun logo
+    assert analyser_ecran(img) == (None, False)
+    assert analyser_ecran(np.full((1080, 1920, 3), 20, np.uint8)) == (None, False)
+
+
+def test_logos_grises_reels_ecran_present():
+    from war_auto.detection import analyser_ecran
+
+    img = np.array(Image.open(Path(__file__).parent / "fixtures" / "equipes_grisees.png").convert("RGB"))
+    assert analyser_ecran(img)[1]
