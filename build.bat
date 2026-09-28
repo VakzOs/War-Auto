@@ -4,13 +4,16 @@ cd /d "%~dp0"
 python -m pip install -r requirements-dev.txt || goto erreur
 python -m PyInstaller --clean --noconfirm War-Auto.spec || goto erreur
 echo.
+echo === Verification de dist\War-Auto.exe ===
+python assets\verifier_exe.py || goto erreur
+rem Vide le cache d'icones de l'explorateur (sinon il garde l'ancienne icone).
+ie4uinit.exe -show >nul 2>&1
+echo.
 echo OK : dist\War-Auto.exe
-echo Si l'ancienne icone s'affiche encore, c'est le cache de Windows :
-echo deplace ou renomme l'exe pour la voir.
 pause
 exit /b 0
 :erreur
 echo.
-echo ECHEC de la construction, voir les messages ci-dessus.
+echo ECHEC, voir les messages ci-dessus.
 pause
 exit /b 1

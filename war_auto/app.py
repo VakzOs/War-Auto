@@ -204,7 +204,7 @@ class Fenetre:
         # Polices en points : Tk les convertit avec ce facteur.
         self.racine.tk.call("tk", "scaling", self.echelle * 96 / 72)
         s = self.s
-        self.racine.title("War-Auto — @VakzOs")
+        self.racine.title("War-Auto")
         self.racine.configure(bg=FOND, padx=s(16), pady=s(16))
         self.racine.resizable(False, False)
         self.racine.attributes("-topmost", True)
