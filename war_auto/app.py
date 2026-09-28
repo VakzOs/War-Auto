@@ -28,6 +28,7 @@ from war_auto.icone import ICONE
 from war_auto.logos import LOGOS
 
 INTERVALLE_RECHERCHE = 0.02  # s entre deux analyses quand l'écran n'est pas là
+ARRET_AUTO = 10  # s sans écran de faction après un clic -> désactivation
 
 COULEURS = {"bleu": "#4fafe7", "rouge": "#f1553f", "vert": "#22d760"}
 FOND = "#141414"
@@ -143,12 +144,14 @@ def cliquer(x: int, y: int) -> None:
 class Automate(threading.Thread):
     """Boucle d'arrière-plan : capture chaque écran, cherche les logos, clique."""
 
-    def __init__(self, signaler, delai_clic_ms: int):
+    def __init__(self, signaler, arret_auto, delai_clic_ms: int):
         super().__init__(daemon=True)
         self.actif = False
         self.faction: str | None = None
         self.delai_clic_ms = delai_clic_ms
         self._signaler = signaler
+        self._arret_auto = arret_auto
+        self._dernier_clic: float | None = None
         self._dernier_message = ""
         self._ecran_prefere = 0  # on commence par l'écran où les logos étaient
 
@@ -161,13 +164,21 @@ class Automate(threading.Thread):
         with mss.mss() as capture:
             while True:
                 if not (self.actif and self.faction):
+                    self._dernier_clic = None
                     time.sleep(INTERVALLE_RECHERCHE)
                     continue
                 cible = self.trouver(capture)
                 if cible:
                     cliquer(*cible)
+                    self._dernier_clic = time.monotonic()
                     self.signaler(f"Clic sur {FACTIONS[self.faction]['nom']} ({cible[0]}, {cible[1]})")
                     time.sleep(self.delai_clic_ms / 1000)
+                elif self._dernier_clic and time.monotonic() - self._dernier_clic >= ARRET_AUTO:
+                    # L'écran a disparu depuis 10 s après nos clics : la faction
+                    # est prise, on s'arrête.
+                    self.actif = False
+                    self._dernier_clic = None
+                    self._arret_auto()
                 else:
                     self.signaler("En attente de l'écran de faction…")
                     time.sleep(INTERVALLE_RECHERCHE)
@@ -202,6 +213,7 @@ class Fenetre:
 
         self.statut = tk.StringVar(value="Inactif")
         self.automate = Automate(lambda msg: self.racine.after(0, self.statut.set, msg),
+                                 lambda: self.racine.after(0, self.arret_auto),
                                  self.config["delai_clic_ms"])
         self.en_attente_touche: str | None = None  # action dont on change la touche
         self.touches_enfoncees: set[int] = set()
@@ -299,6 +311,12 @@ class Fenetre:
         elif not self.automate.faction:
             self.statut.set("Actif — choisis ton équipe")
         self.rafraichir()
+
+    def arret_auto(self) -> None:
+        self.automate._dernier_message = ""
+        self.statut.set(f"Désactivé : plus d'écran de faction depuis {ARRET_AUTO} s")
+        self.rafraichir()
+        self.bip(520)
 
     def choisir(self, cle: str) -> None:
         # Recliquer sur l'équipe déjà choisie la désélectionne.
