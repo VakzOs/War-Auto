@@ -56,3 +56,28 @@ def test_capture_windows_bgra():
     img = _capture(2.0)
     bgra = np.dstack([img[..., ::-1], np.full(img.shape[:2], 255, np.uint8)])
     _verifier(trouver_factions(bgra, bgr=True), 2.0)
+
+
+def _griser(img, x0, x1):
+    """Simule une équipe pleine : le jeu assombrit son logo (~25 %)."""
+    img[:, x0:x1] = (img[:, x0:x1] * 0.27).astype(np.uint8)
+
+
+@pytest.mark.parametrize("zones", [[(230, 380)], [(80, 230), (380, 530)], [(80, 530)]])
+def test_equipes_grisees(zones):
+    img = _capture(2.0)
+    for x0, x1 in zones:
+        _griser(img, x0 * 2, x1 * 2)
+    _verifier(trouver_factions(img), 2.0)
+
+
+def test_logos_grises_reels():
+    """Capture réelle de logos grisés (rouge et vert) : on les retrouve."""
+    from war_auto.detection import FACTIONS, _masque, _teintes, VAL_MIN_GRISE, _fusionner, _taches
+
+    img = np.array(Image.open(Path(__file__).parent / "fixtures" / "equipes_grisees.png").convert("RGB"))
+    teinte = _teintes(img, VAL_MIN_GRISE)
+    for cle, (x, y) in {"rouge": (140, 140), "vert": (438, 140)}.items():
+        tache = max(_fusionner(_taches(_masque(teinte, FACTIONS[cle]["teinte"]))), key=lambda t: t.cellules)
+        cx, cy = tache.centre
+        assert abs(cx - x) < 20 and abs(cy - y) < 20, (cle, tache)

@@ -9,18 +9,21 @@
 from __future__ import annotations
 
 import ctypes
+import io
 import json
 import os
 import sys
 import threading
 import time
 import tkinter as tk
+import wave
 from pathlib import Path
 
 import mss
 import numpy as np
 
 from war_auto.detection import FACTIONS, trouver_factions
+from war_auto.icone import ICONE
 from war_auto.logos import LOGOS
 
 INTERVALLE_RECHERCHE = 0.02  # s entre deux analyses quand l'écran n'est pas là
@@ -37,6 +40,7 @@ VK_F5, VK_F6, VK_F7, VK_F8 = 0x74, 0x75, 0x76, 0x77
 CONFIG_DEFAUT = {
     "touches": {"activer": VK_F8, "bleu": VK_F5, "rouge": VK_F6, "vert": VK_F7},
     "delai_clic_ms": 50,
+    "volume": 25,  # % (0 = muet)
 }
 FICHIER_CONFIG = Path(os.environ.get("APPDATA", Path.home())) / "War-Auto" / "config.json"
 
@@ -49,6 +53,7 @@ def charger_config() -> dict:
         lu = json.loads(FICHIER_CONFIG.read_text(encoding="utf-8"))
         config["touches"].update(lu.get("touches", {}))
         config["delai_clic_ms"] = int(lu.get("delai_clic_ms", config["delai_clic_ms"]))
+        config["volume"] = int(lu.get("volume", config["volume"]))
     except (OSError, ValueError):
         pass
     return config
@@ -80,10 +85,30 @@ def touche_enfoncee(vk: int) -> bool:
     return bool(user32.GetAsyncKeyState(vk) & 0x8000)
 
 
-def bip(frequence: int) -> None:
+def son_bip(frequence: int, volume: int) -> bytes:
+    """WAV d'un bip doux (sinus avec fondu), au volume voulu (0-100)."""
+    taux, duree = 44100, 0.09
+    t = np.arange(int(taux * duree)) / taux
+    fondu = np.minimum(1, np.minimum(t, duree - t) / 0.015)
+    amplitude = (volume / 100) ** 2 * 0.6 * 32767  # courbe douce : 25 % reste discret
+    donnees = (np.sin(2 * np.pi * frequence * t) * fondu * amplitude).astype("<i2")
+    tampon = io.BytesIO()
+    with wave.open(tampon, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taux)
+        w.writeframes(donnees.tobytes())
+    return tampon.getvalue()
+
+
+def bip(frequence: int, volume: int) -> None:
     """Petit son pour savoir, en jeu, ce qu'un raccourci a fait."""
+    if volume <= 0:
+        return
     import winsound
-    threading.Thread(target=winsound.Beep, args=(frequence, 70), daemon=True).start()
+    son = son_bip(frequence, volume)
+    threading.Thread(target=winsound.PlaySound, args=(son, winsound.SND_MEMORY),
+                     daemon=True).start()
 
 
 def rendre_dpi_aware() -> None:
@@ -171,6 +196,8 @@ class Fenetre:
         self.racine.configure(bg=FOND, padx=s(16), pady=s(16))
         self.racine.resizable(False, False)
         self.racine.attributes("-topmost", True)
+        self.icone = tk.PhotoImage(data=ICONE)
+        self.racine.iconphoto(True, self.icone)
 
         self.statut = tk.StringVar(value="Inactif")
         self.automate = Automate(lambda msg: self.racine.after(0, self.statut.set, msg),
@@ -225,6 +252,18 @@ class Fenetre:
                    font=(POLICE, 9)).pack(side="right")
         self.delai.trace_add("write", lambda *_: self.changer_delai())
 
+        # Volume des bips
+        ligne_volume = tk.Frame(self.racine, bg=FOND)
+        ligne_volume.pack(fill="x", pady=(s(8), 0))
+        tk.Label(ligne_volume, text="Volume des bips (%)", bg=FOND, fg=TEXTE,
+                 font=(POLICE, 9)).pack(side="left")
+        self.volume = tk.IntVar(value=self.config["volume"])
+        tk.Spinbox(ligne_volume, from_=0, to=100, increment=5, width=5,
+                   textvariable=self.volume, command=lambda: self.bip(880), relief="flat",
+                   bg=CARTE, fg=TEXTE, buttonbackground=CARTE, insertbackground=TEXTE,
+                   font=(POLICE, 9)).pack(side="right")
+        self.volume.trace_add("write", lambda *_: self.changer_volume())
+
         tk.Label(self.racine, textvariable=self.statut, bg=FOND, fg=GRIS,
                  font=(POLICE, 9), wraplength=s(300), justify="left").pack(anchor="w", pady=(s(12), 0))
         tk.Label(self.racine, text="Clique sur une touche pour la changer.", bg=FOND, fg=GRIS,
@@ -267,7 +306,7 @@ class Fenetre:
         if not self.automate.actif:
             self.basculer()
         self.rafraichir()
-        bip(880)
+        self.bip(880)
 
     def changer_delai(self) -> None:
         try:
@@ -277,6 +316,16 @@ class Fenetre:
         self.automate.delai_clic_ms = delai
         self.config["delai_clic_ms"] = delai
         sauver_config(self.config)
+
+    def changer_volume(self) -> None:
+        try:
+            self.config["volume"] = max(0, min(100, int(self.volume.get())))
+        except (tk.TclError, ValueError):
+            return
+        sauver_config(self.config)
+
+    def bip(self, frequence: int) -> None:
+        bip(frequence, self.config["volume"])
 
     def attendre_touche(self, action: str) -> None:
         self.en_attente_touche = action
@@ -314,7 +363,7 @@ class Fenetre:
                 if enfonce and vk not in self.touches_enfoncees:
                     if action == "activer":
                         self.basculer()
-                        bip(1200 if self.automate.actif else 500)
+                        self.bip(1040 if self.automate.actif else 520)
                     else:
                         self.raccourci_faction(action)
                 if enfonce:
@@ -352,6 +401,10 @@ def main() -> None:
     if sys.platform != "win32":
         sys.exit("War-Auto fonctionne uniquement sous Windows.")
     rendre_dpi_aware()
+    try:  # icône de l'app (et non celle de Python) dans la barre des tâches
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("VakzOs.WarAuto")
+    except Exception:
+        pass
     Fenetre().lancer()
 
 

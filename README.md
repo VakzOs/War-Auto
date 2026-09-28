@@ -13,6 +13,9 @@ Petit autoclicker Windows qui choisit automatiquement ta faction sur l'écran
    l'active aussi. Dès que l'écran de faction apparaît, il clique sur le logo.
 
 - Un bip confirme chaque raccourci (aigu : activé, grave : désactivé).
+  **Volume des bips** réglable (25 % par défaut, 0 = muet).
+- Une équipe pleine a son logo **grisé** : il continue de cliquer dessus,
+  pour prendre une place dès qu'elle se libère.
 - Clique sur une touche affichée (F5, F8…) puis appuie sur la nouvelle touche
   pour la changer (Échap annule).
 - **Délai entre clics** : 50 ms par défaut, réglable de 0 à 1000 ms.
@@ -36,6 +39,11 @@ Ou en local (Python 3.10+) : `build.bat` → `dist\War-Auto.exe`.
 
 Pour lancer sans compiler : `pip install -r requirements.txt` puis
 `python War-Auto.py`.
+
+## Icône
+
+`assets/war-auto.ico` (exe) et `war_auto/icone.py` (fenêtre) sont générés par
+`python assets/generer_icone.py`.
 
 ## Tests
 
